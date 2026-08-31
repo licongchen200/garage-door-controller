@@ -109,14 +109,14 @@ class MqttBridge:
                 self._ack_events.pop(command_id, None)
 
     def _on_connect(self, client: mqtt.Client, userdata: Any, flags: Any, reason_code: Any, properties: Any) -> None:
-        if int(reason_code) != 0:
+        if reason_code.is_failure:
             logger.warning("MQTT connection failed: %s", reason_code)
             return
         client.subscribe([(STATE_TOPIC, 0), (ACK_TOPIC, 0), (LWT_TOPIC, 0)])
         logger.info("MQTT connected to %s:%s", self.settings.mqtt_host, self.settings.mqtt_port)
 
     def _on_disconnect(self, client: mqtt.Client, userdata: Any, disconnect_flags: Any, reason_code: Any, properties: Any) -> None:
-        if int(reason_code) != 0:
+        if reason_code.is_failure:
             logger.info("MQTT disconnected: %s", reason_code)
 
     def _on_message(self, client: mqtt.Client, userdata: Any, message: mqtt.MQTTMessage) -> None:

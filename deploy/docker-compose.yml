@@ -1,0 +1,36 @@
+# "garage-network" is external (created by setup.sh, not by compose) so that
+# an existing standalone broker - and the host's shared reverse proxy, whatever
+# it is - can be `docker network connect`-ed onto it and reach services here
+# by container name, without opening any port at the host firewall.
+networks:
+  garage-network:
+    external: true
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    networks:
+      - garage-network
+    ports:
+      - "1883:1883"
+    volumes:
+      - ${MQTT_DIR:-~/mqtt}/config:/mosquitto/config
+      - ${MQTT_DIR:-~/mqtt}/data:/mosquitto/data
+      - ${MQTT_DIR:-~/mqtt}/log:/mosquitto/log
+
+  garage-door-api:
+    build:
+      context: ../service
+    restart: unless-stopped
+    networks:
+      - garage-network
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Resolve the broker by container name on garage-network, whether it's
+      # this compose file's own "mosquitto" service or an existing standalone
+      # broker container that setup.sh joined onto the same network.
+      MQTT_HOST: mosquitto

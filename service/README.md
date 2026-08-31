@@ -5,10 +5,11 @@ Python 3.11+ (the service is also tested with current Python releases).
 
 ## Configuration
 
-Copy `.env.example` to the process environment. `JWT_SECRET` and `APPLE_BUNDLE_ID` are required;
-the service refuses to start without them. `APPLE_BUNDLE_ID` must equal the iOS app's bundle ID.
-The API JWT uses **HS256** and lasts exactly **30 days** (`JWT_TTL_DAYS=30`). Keep the secret only
-on the API host; never put it in the iOS app.
+For a real deployment, see [`../deploy/`](../deploy/) - `deploy/.env` (copied from
+`deploy/.env.example`) is what `docker-compose.yml` loads. `JWT_SECRET` and `APPLE_BUNDLE_ID` are
+required; the service refuses to start without them. `APPLE_BUNDLE_ID` must equal the iOS app's
+bundle ID. The API JWT uses **HS256** and lasts exactly **30 days** (`JWT_TTL_DAYS=30`). Keep the
+secret only on the API host; never put it in the iOS app.
 
 The MQTT client uses paho-mqtt and subscribes to the topics in
 [`docs/architecture/v1-python-api-bridge.md`](../docs/architecture/v1-python-api-bridge.md). It
