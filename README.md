@@ -2,9 +2,13 @@
 
 iOS app to monitor and control a garage door, backed by an ESP32 (relay + door sensor) and MQTT.
 
-This repo covers the iOS app and its integration contract. The ESP32 firmware, physical wiring, and
-home-server infrastructure (MQTT broker, and — as of v1 — a small Python bridge service) live outside
-this repo.
+This repo contains the iOS app and the Python API bridge. The ESP32 firmware, physical wiring, and
+home-server MQTT broker remain outside this repo.
+
+- [`ios/`](ios/) — SwiftUI app using Sign in with Apple, Keychain, and HTTPS polling.
+- [`service/`](service/) — FastAPI service issuing app JWTs and bridging REST to local MQTT.
+
+See [`service/README.md`](service/README.md) for configuration and local startup instructions.
 
 See [`docs/architecture/`](docs/architecture/) for the design history:
 
