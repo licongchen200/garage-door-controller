@@ -1,0 +1,23 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ${MQTT_DIR:-~/mqtt}/config:/mosquitto/config
+      - ${MQTT_DIR:-~/mqtt}/data:/mosquitto/data
+      - ${MQTT_DIR:-~/mqtt}/log:/mosquitto/log
+
+  garage-door-api:
+    build:
+      context: ../service
+    restart: unless-stopped
+    # Host networking so MQTT_HOST=localhost (the .env.example default) reaches
+    # the broker regardless of whether it's the "mosquitto" service above or an
+    # existing standalone broker already publishing 1883 on this host - deploy.sh
+    # deliberately never starts/touches the "mosquitto" service if one's already
+    # running, so this service can't rely on compose's own service-name DNS.
+    network_mode: host
+    env_file:
+      - .env

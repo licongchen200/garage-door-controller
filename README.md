@@ -18,3 +18,12 @@ See [`docs/architecture/`](docs/architecture/) for the design history:
   ever exposed to the internet.
 
 Single environment, no dev/prod split — this is a small personal project.
+
+## Deploying
+
+See [`deploy/`](deploy/) for the Docker Compose setup:
+
+- `deploy/setup.sh` — one-time per host: creates the MQTT broker's config/data/log directories, generates its password file if missing, and starts the broker (skipped if one's already running on port 1883).
+- `deploy/deploy.sh` — run this whenever the service code changes: pulls, rebuilds, and restarts just the `garage-door-api` container.
+
+Both assume `service/.env` already exists (copy `service/.env.example` and fill in real values first).
