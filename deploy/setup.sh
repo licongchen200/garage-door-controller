@@ -10,6 +10,13 @@ MQTT_USER="${MQTT_USER:-firstmate}"
 
 mkdir -p "$MQTT_DIR/config" "$MQTT_DIR/data" "$MQTT_DIR/log"
 
+if ! docker network inspect garage-network >/dev/null 2>&1; then
+  docker network create garage-network
+  echo "created garage-network"
+else
+  echo "garage-network already exists"
+fi
+
 if [ ! -f "$MQTT_DIR/config/mosquitto.conf" ]; then
   cp "$SCRIPT_DIR/mosquitto/mosquitto.conf" "$MQTT_DIR/config/mosquitto.conf"
   echo "wrote $MQTT_DIR/config/mosquitto.conf"
@@ -29,9 +36,16 @@ else
   echo "$MQTT_DIR/config/passwd already exists, leaving it alone"
 fi
 
-if docker ps --format '{{.Ports}}' | grep -q '1883->1883'; then
-  echo "a broker is already listening on 1883 - not starting a second one"
+EXISTING_BROKER="$(docker ps --filter 'publish=1883' --format '{{.Names}}' | head -1)"
+if [ -n "$EXISTING_BROKER" ]; then
+  echo "a broker is already listening on 1883 ($EXISTING_BROKER) - not starting a second one"
+  docker network connect garage-network "$EXISTING_BROKER" 2>/dev/null \
+    && echo "joined $EXISTING_BROKER to garage-network" \
+    || echo "$EXISTING_BROKER is already on garage-network"
 else
   MQTT_DIR="$MQTT_DIR" docker compose -f "$SCRIPT_DIR/docker-compose.yml" up -d mosquitto
   echo "mosquitto is up"
 fi
+
+echo "join the host's reverse proxy container to garage-network too, e.g.:"
+echo "  docker network connect garage-network <your-nginx-container>"
