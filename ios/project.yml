@@ -13,8 +13,8 @@ targets:
       path: GarageDoor/GarageDoor.entitlements
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.garagedoor
-        INFOPLIST_KEY_APIBaseURL: https://garage.example.invalid
+        PRODUCT_BUNDLE_IDENTIFIER: org.licongchen.home
+        INFOPLIST_KEY_APIBaseURL: https://garage-api.licongchen.org
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
@@ -24,7 +24,7 @@ targets:
         CFBundleDisplayName: Garage Door
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
-        APIBaseURL: https://garage.example.invalid
+        APIBaseURL: https://garage-api.licongchen.org
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

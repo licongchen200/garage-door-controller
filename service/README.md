@@ -24,7 +24,7 @@ cd service
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 export JWT_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-export APPLE_BUNDLE_ID=com.example.garagedoor
+export APPLE_BUNDLE_ID=org.licongchen.home
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
