@@ -3,7 +3,14 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var model = GarageDoorViewModel()
+    @StateObject private var auth: AuthStore
+    @StateObject private var model: GarageDoorViewModel
+
+    init() {
+        let auth = AuthStore()
+        _auth = StateObject(wrappedValue: auth)
+        _model = StateObject(wrappedValue: GarageDoorViewModel(auth: auth))
+    }
 
     var body: some View {
         NavigationStack {
@@ -11,7 +18,7 @@ struct ContentView: View {
                 GarageBackground()
 
                 Group {
-                    if model.auth.isAuthenticated {
+                    if auth.isAuthenticated {
                         doorView
                     } else {
                         signInView
@@ -23,8 +30,8 @@ struct ContentView: View {
         }
         .tint(GaragePalette.amber)
         .preferredColorScheme(.dark)
-        .task(id: "\(scenePhase == .active)-\(model.auth.isAuthenticated)") {
-            guard scenePhase == .active, model.auth.isAuthenticated else { return }
+        .task(id: "\(scenePhase == .active)-\(auth.isAuthenticated)") {
+            guard scenePhase == .active, auth.isAuthenticated else { return }
             await model.pollWhileForegrounded()
         }
     }
@@ -160,7 +167,7 @@ struct ContentView: View {
                 }
 
                 Button {
-                    model.auth.signOut()
+                    auth.signOut()
                 } label: {
                     Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                         .font(.system(.subheadline, design: .rounded).weight(.semibold))
