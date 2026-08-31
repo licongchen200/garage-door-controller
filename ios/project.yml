@@ -16,7 +16,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: org.licongchen.home
         INFOPLIST_KEY_APIBaseURL: https://garage-api.licongchen.org
         SWIFT_VERSION: "5.9"
-        TARGETED_DEVICE_FAMILY: "1,2"
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         DEVELOPMENT_TEAM: 37ZJ27LLP9
         CODE_SIGN_STYLE: Automatic
     info:
