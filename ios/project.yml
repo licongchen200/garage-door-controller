@@ -17,6 +17,7 @@ targets:
         INFOPLIST_KEY_APIBaseURL: https://garage-api.licongchen.org
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1,2"
+        DEVELOPMENT_TEAM: 37ZJ27LLP9
         CODE_SIGN_STYLE: Automatic
     info:
       path: GarageDoor/Info.plist
