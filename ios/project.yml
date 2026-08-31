@@ -27,6 +27,11 @@ targets:
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
         APIBaseURL: https://garage-api.licongchen.org
+        # The app only uses standard HTTPS (URLSession/TLS) - no custom or
+        # proprietary encryption - so it qualifies for the standard export
+        # exemption. Declaring this upfront means every future build skips
+        # the manual "missing compliance" step in App Store Connect.
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
