@@ -86,6 +86,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					AA813B3295F38F29E0A30C81 = {
+						DevelopmentTeam = 37ZJ27LLP9;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -132,6 +133,7 @@
 				CODE_SIGN_ENTITLEMENTS = GarageDoor/GarageDoor.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 37ZJ27LLP9;
 				INFOPLIST_FILE = GarageDoor/Info.plist;
 				INFOPLIST_KEY_APIBaseURL = "https://garage-api.licongchen.org";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -271,6 +273,7 @@
 				CODE_SIGN_ENTITLEMENTS = GarageDoor/GarageDoor.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 37ZJ27LLP9;
 				INFOPLIST_FILE = GarageDoor/Info.plist;
 				INFOPLIST_KEY_APIBaseURL = "https://garage-api.licongchen.org";
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<!-- Uploads as part of the export. Keeps the whole thing one xcodebuild
+	     invocation instead of an .ipa on disk plus a second altool call. -->
+	<key>destination</key>
+	<string>upload</string>
+	<key>teamID</key>
+	<string>37ZJ27LLP9</string>
+	<!-- The script sets CURRENT_PROJECT_VERSION from the commit count. Left true,
+	     Xcode overwrites it with its own guess and the build number stops
+	     tracing back to a commit. -->
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+	<key>uploadSymbols</key>
+	<true/>
+</dict>
+</plist>
