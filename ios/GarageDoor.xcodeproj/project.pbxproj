@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		29B20D2632866234C4728E39 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DEFD134972CCAB136ED707 /* ContentView.swift */; };
 		5A97EC7DC53B117FE5F8204D /* GarageDoorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD2A2685BADA38264EA8E787 /* GarageDoorApp.swift */; };
+		5AAE8A7B6F8A37BC4D0B1ECB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8079318ABE96776875B05D3A /* Assets.xcassets */; };
 		6585AAB0D21F0FF418085666 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E342FF2DD1B0AB43561B05EA /* KeychainStore.swift */; };
 		AECA8EF57901DA6B1B3B9538 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA5B2826164850C3F46238D6 /* APIClient.swift */; };
 		D78927553330745E79F31531 /* GarageDoorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4C3407A0CDE911F5E690B9 /* GarageDoorViewModel.swift */; };
@@ -18,6 +19,7 @@
 		393F3E5DE9D196DABD6CA12D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4A4C3407A0CDE911F5E690B9 /* GarageDoorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GarageDoorViewModel.swift; sourceTree = "<group>"; };
 		5EA82A84621D3B6117091D17 /* GarageDoor.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = GarageDoor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8079318ABE96776875B05D3A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		86DEFD134972CCAB136ED707 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AB668E47F24CC2F673C7DF6C /* GarageDoor.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GarageDoor.entitlements; sourceTree = "<group>"; };
 		DA5B2826164850C3F46238D6 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
@@ -30,6 +32,7 @@
 			isa = PBXGroup;
 			children = (
 				DA5B2826164850C3F46238D6 /* APIClient.swift */,
+				8079318ABE96776875B05D3A /* Assets.xcassets */,
 				86DEFD134972CCAB136ED707 /* ContentView.swift */,
 				AB668E47F24CC2F673C7DF6C /* GarageDoor.entitlements */,
 				FD2A2685BADA38264EA8E787 /* GarageDoorApp.swift */,
@@ -64,6 +67,7 @@
 			buildConfigurationList = 8DAACA3E07AA7EA5EE5A4AE2 /* Build configuration list for PBXNativeTarget "GarageDoor" */;
 			buildPhases = (
 				9F8A28EEC88B3AADCA3B8437 /* Sources */,
+				EF40130054F495CB81A320E3 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -110,6 +114,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		EF40130054F495CB81A320E3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5AAE8A7B6F8A37BC4D0B1ECB /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		9F8A28EEC88B3AADCA3B8437 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -143,7 +158,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = org.licongchen.home;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -283,7 +298,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = org.licongchen.home;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
