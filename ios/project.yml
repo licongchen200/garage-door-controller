@@ -11,20 +11,33 @@ targets:
       - path: GarageDoor
     entitlements:
       path: GarageDoor/GarageDoor.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.garagedoor
-        INFOPLIST_KEY_APIBaseURL: https://garage.example.invalid
+        PRODUCT_BUNDLE_IDENTIFIER: org.licongchen.home
+        INFOPLIST_KEY_APIBaseURL: https://garage-api.licongchen.org
         SWIFT_VERSION: "5.9"
-        TARGETED_DEVICE_FAMILY: "1,2"
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        DEVELOPMENT_TEAM: 37ZJ27LLP9
         CODE_SIGN_STYLE: Automatic
+        # push.sh overrides this per-build with the git commit count; this is
+        # just the default for a plain Xcode build outside that script.
+        CURRENT_PROJECT_VERSION: "1"
     info:
       path: GarageDoor/Info.plist
       properties:
-        CFBundleDisplayName: Garage Door
+        CFBundleDisplayName: Proxima Digital
         CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "1"
-        APIBaseURL: https://garage.example.invalid
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        APIBaseURL: https://garage-api.licongchen.org
+        # The app only uses standard HTTPS (URLSession/TLS) - no custom or
+        # proprietary encryption - so it qualifies for the standard export
+        # exemption. Declaring this upfront means every future build skips
+        # the manual "missing compliance" step in App Store Connect.
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
