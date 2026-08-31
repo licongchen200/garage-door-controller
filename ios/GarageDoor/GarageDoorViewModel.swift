@@ -1,4 +1,5 @@
 import AuthenticationServices
+import Combine
 import Foundation
 import SwiftUI
 
@@ -43,10 +44,19 @@ final class GarageDoorViewModel: ObservableObject {
 
     let auth: AuthStore
     private let api: APIClient
+    // AuthStore is a nested ObservableObject: its own @Published changes (e.g.
+    // signOut() clearing appToken) do NOT automatically propagate to this
+    // view model's objectWillChange, so SwiftUI never re-renders ContentView
+    // on sign-out without this forwarding subscription.
+    private var authCancellable: AnyCancellable?
 
     init(api: APIClient = APIClient(), auth: AuthStore? = nil) {
         self.api = api
-        self.auth = auth ?? AuthStore()
+        let resolvedAuth = auth ?? AuthStore()
+        self.auth = resolvedAuth
+        authCancellable = resolvedAuth.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     var displayedState: String {
