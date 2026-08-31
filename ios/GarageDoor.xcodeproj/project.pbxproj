@@ -133,12 +133,12 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = GarageDoor/Info.plist;
-				INFOPLIST_KEY_APIBaseURL = "https://garage.example.invalid";
+				INFOPLIST_KEY_APIBaseURL = "https://garage-api.licongchen.org";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.garagedoor;
+				PRODUCT_BUNDLE_IDENTIFIER = org.licongchen.home;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -272,12 +272,12 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = GarageDoor/Info.plist;
-				INFOPLIST_KEY_APIBaseURL = "https://garage.example.invalid";
+				INFOPLIST_KEY_APIBaseURL = "https://garage-api.licongchen.org";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.garagedoor;
+				PRODUCT_BUNDLE_IDENTIFIER = org.licongchen.home;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.9;
 				TARGETED_DEVICE_FAMILY = "1,2";
