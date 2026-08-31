@@ -11,3 +11,7 @@ __pycache__/
 DerivedData/
 *.xcuserstate
 xcuserdata/
+
+# ESP32 / PlatformIO
+.pio/
+esp32/include/config.h
