@@ -148,6 +148,7 @@
 				CODE_SIGN_ENTITLEMENTS = GarageDoor/GarageDoor.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 37ZJ27LLP9;
 				INFOPLIST_FILE = GarageDoor/Info.plist;
 				INFOPLIST_KEY_APIBaseURL = "https://garage-api.licongchen.org";
@@ -288,6 +289,7 @@
 				CODE_SIGN_ENTITLEMENTS = GarageDoor/GarageDoor.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 37ZJ27LLP9;
 				INFOPLIST_FILE = GarageDoor/Info.plist;
 				INFOPLIST_KEY_APIBaseURL = "https://garage-api.licongchen.org";
