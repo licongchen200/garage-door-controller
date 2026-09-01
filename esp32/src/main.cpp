@@ -39,7 +39,7 @@
 #define MQTT_PASSWORD ""
 #endif
 
-// Keep this as the only hardware-specific output pin for the onboard RGB LED.
+// Keep this as the only hardware-specific output pin for the onboard LED.
 static constexpr uint8_t DOOR_LED_PIN = 8;
 
 static constexpr char CMD_TOPIC[] = "garage/door/cmd";
@@ -63,7 +63,8 @@ bool ntpConfigured = false;
 
 void setLedForState() {
   const bool doorIsOpen = strcmp(doorState, "open") == 0;
-  neopixelWrite(DOOR_LED_PIN, 0, doorIsOpen ? 255 : 0, 0);
+  // The ESP32-C3 Super Mini onboard LED is active-low: LOW turns it on.
+  digitalWrite(DOOR_LED_PIN, doorIsOpen ? LOW : HIGH);
 }
 
 uint32_t currentTimestamp() {
@@ -182,6 +183,7 @@ void startWifiIfNeeded() {
 
 void setup() {
   Serial.begin(115200);
+  pinMode(DOOR_LED_PIN, OUTPUT);
   setLedForState();
 
   mqttClient.setCallback(onMqttMessage);

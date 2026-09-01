@@ -11,16 +11,15 @@
       "attrs": {}
     },
     {
-      "type": "wokwi-neopixel",
-      "id": "neopixel",
+      "type": "wokwi-led",
+      "id": "led",
       "top": -90,
       "left": 280,
-      "attrs": { "pixels": "1", "label": "door state" }
+      "attrs": { "color": "blue", "label": "door state" }
     }
   ],
   "connections": [
-    [ "esp:8", "neopixel:DIN", "green", [] ],
-    [ "neopixel:VDD", "esp:5V.1", "red", [] ],
-    [ "neopixel:VSS", "esp:GND.1", "black", [] ]
+    [ "esp:3V3.1", "led:A", "red", [] ],
+    [ "esp:8", "led:C", "green", [] ]
   ]
 }
