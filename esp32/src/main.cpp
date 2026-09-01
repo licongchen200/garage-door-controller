@@ -39,8 +39,17 @@
 #define MQTT_PASSWORD ""
 #endif
 
-// Keep this as the only hardware-specific output pin for the onboard LED.
+static constexpr uint8_t RELAY_PIN = 4;
+static constexpr uint8_t CLOSED_SENSOR_PIN = 5;
+static constexpr uint8_t OPEN_SENSOR_PIN = 6;
 static constexpr uint8_t DOOR_LED_PIN = 8;
+
+// The wired relay module is active-low on its IN pin. Keep the pulse short and
+// release the control line between commands so it behaves like a wall button.
+static constexpr uint8_t RELAY_ACTIVE_LEVEL = LOW;
+static constexpr uint8_t RELAY_INACTIVE_LEVEL = HIGH;
+static constexpr unsigned long RELAY_PULSE_MS = 500;
+static constexpr size_t RELAY_QUEUE_CAPACITY = 8;
 
 static constexpr char CMD_TOPIC[] = "garage/door/cmd";
 static constexpr char ACK_TOPIC[] = "garage/door/cmd/ack";
@@ -49,22 +58,69 @@ static constexpr char LWT_TOPIC[] = "garage/door/lwt";
 static constexpr char LWT_ONLINE[] = R"({"online":true})";
 static constexpr char LWT_OFFLINE[] = R"({"online":false})";
 
-// Match deploy/mock-esp32.py's simulated transition delay until real hardware exists.
-static constexpr unsigned long SIMULATED_TRANSITION_MS = 2000;
 static constexpr unsigned long WIFI_RETRY_MS = 10000;
 static constexpr unsigned long MQTT_RETRY_MS = 5000;
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
-const char *doorState = "closed";
+const char *doorState = "unknown";
 unsigned long lastWifiAttempt = 0;
 unsigned long lastMqttAttempt = 0;
 bool ntpConfigured = false;
+bool lastKnownDoorWasOpen = false;
+
+struct RelayCommand {
+  char id[96];
+};
+
+RelayCommand relayQueue[RELAY_QUEUE_CAPACITY];
+size_t relayQueueHead = 0;
+size_t relayQueueCount = 0;
+RelayCommand activeRelayCommand = {};
+bool relayPulseActive = false;
+unsigned long relayPulseStartedAt = 0;
+
+bool publishState();
 
 void setLedForState() {
-  const bool doorIsOpen = strcmp(doorState, "open") == 0;
   // The ESP32-C3 Super Mini onboard LED is active-low: LOW turns it on.
-  digitalWrite(DOOR_LED_PIN, doorIsOpen ? LOW : HIGH);
+  // During transit/unknown, retain the last known open/closed indication.
+  digitalWrite(DOOR_LED_PIN, lastKnownDoorWasOpen ? LOW : HIGH);
+}
+
+const char *readDoorState() {
+  const bool doorIsClosed = digitalRead(CLOSED_SENSOR_PIN) == LOW;
+  const bool doorIsOpen = digitalRead(OPEN_SENSOR_PIN) == LOW;
+
+  if (doorIsClosed && !doorIsOpen) {
+    return "closed";
+  }
+  if (doorIsOpen && !doorIsClosed) {
+    return "open";
+  }
+
+  // Both HIGH means neither end-stop is active (transit/not fully seated).
+  // Both LOW is also physically contradictory, so report it as unknown.
+  return "unknown";
+}
+
+void pollDoorSensors() {
+  const char *sensedState = readDoorState();
+  if (strcmp(sensedState, doorState) == 0) {
+    return;
+  }
+
+  doorState = sensedState;
+  if (strcmp(doorState, "open") == 0) {
+    lastKnownDoorWasOpen = true;
+  } else if (strcmp(doorState, "closed") == 0) {
+    lastKnownDoorWasOpen = false;
+  }
+  setLedForState();
+
+  if (mqttClient.connected()) {
+    publishState();
+  }
 }
 
 uint32_t currentTimestamp() {
@@ -86,14 +142,61 @@ bool publishState() {
   return published;
 }
 
-void publishAck(const char *commandId) {
+void publishAck(const char *commandId, const char *result = "triggered") {
   JsonDocument document;
   document["id"] = commandId;
-  document["result"] = "triggered";
+  document["result"] = result;
 
   char payload[128];
   serializeJson(document, payload, sizeof(payload));
   mqttClient.publish(ACK_TOPIC, payload);
+}
+
+bool enqueueRelayCommand(const char *commandId) {
+  if (relayQueueCount >= RELAY_QUEUE_CAPACITY) {
+    return false;
+  }
+
+  const size_t queueIndex = (relayQueueHead + relayQueueCount) % RELAY_QUEUE_CAPACITY;
+  strncpy(relayQueue[queueIndex].id, commandId, sizeof(relayQueue[queueIndex].id) - 1);
+  relayQueue[queueIndex].id[sizeof(relayQueue[queueIndex].id) - 1] = '\0';
+  relayQueueCount++;
+  return true;
+}
+
+bool dequeueRelayCommand(RelayCommand *command) {
+  if (relayQueueCount == 0) {
+    return false;
+  }
+
+  *command = relayQueue[relayQueueHead];
+  relayQueueHead = (relayQueueHead + 1) % RELAY_QUEUE_CAPACITY;
+  relayQueueCount--;
+  return true;
+}
+
+void startNextRelayPulse() {
+  if (relayPulseActive || !dequeueRelayCommand(&activeRelayCommand)) {
+    return;
+  }
+
+  digitalWrite(RELAY_PIN, RELAY_ACTIVE_LEVEL);
+  relayPulseStartedAt = millis();
+  relayPulseActive = true;
+  Serial.printf("relay pulse started (id=%s)\n", activeRelayCommand.id);
+}
+
+void serviceRelayPulse() {
+  startNextRelayPulse();
+  if (!relayPulseActive || millis() - relayPulseStartedAt < RELAY_PULSE_MS) {
+    return;
+  }
+
+  digitalWrite(RELAY_PIN, RELAY_INACTIVE_LEVEL);
+  relayPulseActive = false;
+  publishAck(activeRelayCommand.id);
+  Serial.printf("relay pulse released (id=%s)\n", activeRelayCommand.id);
+  startNextRelayPulse();
 }
 
 void onMqttMessage(char *topic, byte *payload, unsigned int length) {
@@ -117,12 +220,10 @@ void onMqttMessage(char *topic, byte *payload, unsigned int length) {
   }
 
   Serial.printf("<- command: %s (id=%s)\n", command, commandId);
-  delay(SIMULATED_TRANSITION_MS);
-
-  doorState = strcmp(command, "open") == 0 ? "open" : "closed";
-  setLedForState();
-  publishAck(commandId);
-  publishState();
+  if (!enqueueRelayCommand(commandId)) {
+    Serial.println("relay command queue full");
+    publishAck(commandId, "error");
+  }
 }
 
 String mqttClientId() {
@@ -183,7 +284,12 @@ void startWifiIfNeeded() {
 
 void setup() {
   Serial.begin(115200);
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, RELAY_INACTIVE_LEVEL);
+  pinMode(CLOSED_SENSOR_PIN, INPUT_PULLUP);
+  pinMode(OPEN_SENSOR_PIN, INPUT_PULLUP);
   pinMode(DOOR_LED_PIN, OUTPUT);
+  pollDoorSensors();
   setLedForState();
 
   mqttClient.setCallback(onMqttMessage);
@@ -199,6 +305,8 @@ void setup() {
 void loop() {
   startWifiIfNeeded();
   connectMqttIfNeeded();
+  pollDoorSensors();
+  serviceRelayPulse();
   if (mqttClient.connected()) {
     mqttClient.loop();
   }

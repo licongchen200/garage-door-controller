@@ -56,15 +56,26 @@ Before wiring the relay, unplug the opener or otherwise power it off. The
 wall-button terminals are low-voltage, but they must still be treated as a
 separate low-voltage control circuit and kept isolated from mains wiring.
 
-## Behavior after firmware support is added
+## Implemented firmware behavior
 
-The reed sensors will replace the current software-only `door_state` guess
-with real position reads. Firmware should use the GPIO5/GPIO6 readings to
-report the door's observed position, and GPIO4 should produce only the
-momentary relay pulse required to trigger the opener.
+This wiring is implemented in `esp32/src/main.cpp`. The firmware polls both
+reed switches in its main loop and reports `closed` when GPIO5 is LOW, `open`
+when GPIO6 is LOW, and `unknown` when neither end-stop is active (or when both
+are active, which is contradictory). The retained state is always derived from
+these live sensor reads; commands do not update it by assumption.
 
-Sensor and relay firmware support is a follow-up task; it is not shipped yet.
-At present, `esp32/src/main.cpp` still maintains `doorState` in memory and
-only configures the onboard LED on GPIO8. This document records the planned
-wiring and behavior and does not imply that GPIO4, GPIO5, or GPIO6 are already
-implemented.
+GPIO4 is configured as an active-low output and emits a 500 ms pulse for each
+valid `open` or `close` command, then returns HIGH. The opener decides the
+direction from its current position; the command string does not change the
+relay behavior. The firmware acknowledges `triggered` only after releasing the
+pulse and does not claim that the door completed its movement.
+
+The active-low relay level matches the common opto-isolated relay-module
+wiring and the Wokwi module configuration. Verify the exact physical module's
+IN polarity before installation; the `RELAY_ACTIVE_LEVEL` constants in
+`esp32/src/main.cpp` are the single adjustment point if it differs.
+
+While either sensor is active, the onboard active-low GPIO8 LED shows the live
+position (lit for open, off for closed). During `unknown`/transit it retains
+the last known open/closed indication to avoid flicker; startup defaults to
+off until an open sensor is observed.

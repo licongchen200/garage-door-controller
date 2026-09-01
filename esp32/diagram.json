@@ -16,10 +16,38 @@
       "top": -90,
       "left": 280,
       "attrs": { "color": "blue", "label": "door state" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "closed-reed",
+      "top": 120,
+      "left": 300,
+      "attrs": { "color": "green", "label": "closed reed", "key": "C", "bounce": "0" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "open-reed",
+      "top": 200,
+      "left": 300,
+      "attrs": { "color": "red", "label": "open reed", "key": "O", "bounce": "0" }
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "relay",
+      "top": 120,
+      "left": 500,
+      "attrs": { "transistor": "pnp" }
     }
   ],
   "connections": [
     [ "esp:3V3.1", "led:A", "red", [] ],
-    [ "esp:8", "led:C", "green", [] ]
+    [ "esp:8", "led:C", "green", [] ],
+    [ "esp:5", "closed-reed:1.l", "green", [] ],
+    [ "closed-reed:2.l", "esp:GND.1", "black", [] ],
+    [ "esp:6", "open-reed:1.l", "green", [] ],
+    [ "open-reed:2.l", "esp:GND.1", "black", [] ],
+    [ "esp:5V", "relay:VCC", "red", [] ],
+    [ "esp:GND.1", "relay:GND", "black", [] ],
+    [ "esp:4", "relay:IN", "green", [] ]
   ]
 }
