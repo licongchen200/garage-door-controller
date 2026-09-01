@@ -46,7 +46,7 @@
     [ "closed-reed:2.l", "esp:GND.1", "black", [] ],
     [ "esp:6", "open-reed:1.l", "green", [] ],
     [ "open-reed:2.l", "esp:GND.1", "black", [] ],
-    [ "esp:5V", "relay:VCC", "red", [] ],
+    [ "esp:5V.1", "relay:VCC", "red", [] ],
     [ "esp:GND.1", "relay:GND", "black", [] ],
     [ "esp:4", "relay:IN", "green", [] ]
   ]
