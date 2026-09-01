@@ -1,7 +1,8 @@
 # ESP32-C3 firmware
 
 This is the v1 hardware replacement for [`deploy/mock-esp32.py`](../deploy/mock-esp32.py).
-It tracks door state in memory only. There are no relay, sensor, or safety-interlock drivers yet.
+It reads the GPIO5 closed and GPIO6 open reed switches and drives the GPIO4 opener relay.
+See [`docs/sensor-relay-wiring.md`](docs/sensor-relay-wiring.md) for the implemented wiring.
 
 ## Configuration
 
@@ -17,10 +18,10 @@ development defaults (`Wokwi-GUEST` and `broker.hivemq.com`) when no config head
 use a private broker and a local `config.h` when testing the real MQTT contract.
 
 The door indicator uses the ESP32-C3 Super Mini's onboard plain blue LED on **GPIO8**. It is lit
-when the tracked state is `open` and off when `closed`; it is not an RGB LED. The LED is wired
-active-low (LOW = on, HIGH = off), so keep that polarity in sync with the firmware if the board
-or pin changes. No external LED wiring or library is required. Change `DOOR_LED_PIN` in
-`src/main.cpp` if the board's indicator pin changes.
+when the sensor-derived state is `open` and off when `closed`; it is not an RGB LED. During
+`unknown`/transit it retains the last known position indication. The LED is wired active-low
+(LOW = on, HIGH = off), so keep that polarity in sync with the firmware if the board or pin
+changes. No external LED wiring or library is required.
 
 ## PlatformIO
 
@@ -37,9 +38,10 @@ for the machine hosting the board rather than assuming a port from another check
 
 ## Wokwi
 
-`diagram.json` contains an ESP32-C3 DevKitM-1 and a simulated plain blue LED connected to GPIO8,
-matching the onboard active-low indicator (GPIO8 LOW lights it). Build the simulation firmware and run it
-from the `esp32/` directory:
+`diagram.json` contains an ESP32-C3 DevKitM-1, a simulated plain blue LED connected to GPIO8,
+pushbuttons standing in for the closed/open reed switches on GPIO5/GPIO6, and an active-low
+simulated relay module on GPIO4. Press `C` to close the closed-reed switch or `O` to close the
+open-reed switch. Build the simulation firmware and run it from the `esp32/` directory:
 
 ```sh
 pio run -e wokwi
