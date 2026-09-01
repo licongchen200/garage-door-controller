@@ -16,8 +16,10 @@ cp include/config.example.h include/config.h
 development defaults (`Wokwi-GUEST` and `broker.hivemq.com`) when no config header is present;
 use a private broker and a local `config.h` when testing the real MQTT contract.
 
-The LED output is **GPIO4**. It is HIGH when the tracked state is `open` and LOW when `closed`.
-Change `DOOR_LED_PIN` in `src/main.cpp` if the wiring changes.
+The door indicator uses the ESP32-C3 Super Mini's onboard WS2812-style addressable RGB LED on
+**GPIO8**. It is green when the tracked state is `open` and off when `closed`. The firmware uses
+the Arduino-ESP32 core's built-in `neopixelWrite()` helper; no external LED wiring or library is
+required. Change `DOOR_LED_PIN` in `src/main.cpp` if the board's RGB LED data pin changes.
 
 ## PlatformIO
 
@@ -34,8 +36,9 @@ for the machine hosting the board rather than assuming a port from another check
 
 ## Wokwi
 
-`diagram.json` contains an ESP32-C3 DevKitM-1, a 220 ohm resistor, and an LED on GPIO4. Build the
-simulation firmware and run it from the `esp32/` directory:
+`diagram.json` contains an ESP32-C3 DevKitM-1 and a simulated one-pixel addressable LED connected
+to GPIO8, matching the onboard WS2812-style indicator. Build the simulation firmware and run it
+from the `esp32/` directory:
 
 ```sh
 pio run -e wokwi

@@ -11,24 +11,16 @@
       "attrs": {}
     },
     {
-      "type": "wokwi-resistor",
-      "id": "resistor",
-      "top": -10,
+      "type": "wokwi-neopixel",
+      "id": "neopixel",
+      "top": -90,
       "left": 280,
-      "rotate": 90,
-      "attrs": { "value": "220" }
-    },
-    {
-      "type": "wokwi-led",
-      "id": "led",
-      "top": -110,
-      "left": 280,
-      "attrs": { "color": "red", "label": "door open" }
+      "attrs": { "pixels": "1", "label": "door state" }
     }
   ],
   "connections": [
-    [ "esp:4", "resistor:1", "green", [] ],
-    [ "resistor:2", "led:A", "green", [] ],
-    [ "led:C", "esp:GND.1", "black", [] ]
+    [ "esp:8", "neopixel:DIN", "green", [] ],
+    [ "neopixel:VDD", "esp:5V.1", "red", [] ],
+    [ "neopixel:VSS", "esp:GND.1", "black", [] ]
   ]
 }

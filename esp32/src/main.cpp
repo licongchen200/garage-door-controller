@@ -39,8 +39,8 @@
 #define MQTT_PASSWORD ""
 #endif
 
-// Keep this as the only hardware-specific output pin for the v1 LED test.
-static constexpr uint8_t DOOR_LED_PIN = 4;
+// Keep this as the only hardware-specific output pin for the onboard RGB LED.
+static constexpr uint8_t DOOR_LED_PIN = 8;
 
 static constexpr char CMD_TOPIC[] = "garage/door/cmd";
 static constexpr char ACK_TOPIC[] = "garage/door/cmd/ack";
@@ -62,7 +62,8 @@ unsigned long lastMqttAttempt = 0;
 bool ntpConfigured = false;
 
 void setLedForState() {
-  digitalWrite(DOOR_LED_PIN, strcmp(doorState, "open") == 0 ? HIGH : LOW);
+  const bool doorIsOpen = strcmp(doorState, "open") == 0;
+  neopixelWrite(DOOR_LED_PIN, 0, doorIsOpen ? 255 : 0, 0);
 }
 
 uint32_t currentTimestamp() {
@@ -181,7 +182,6 @@ void startWifiIfNeeded() {
 
 void setup() {
   Serial.begin(115200);
-  pinMode(DOOR_LED_PIN, OUTPUT);
   setLedForState();
 
   mqttClient.setCallback(onMqttMessage);
