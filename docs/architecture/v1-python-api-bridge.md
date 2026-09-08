@@ -38,10 +38,12 @@ to `$HOME/mqtt` (set `MQTT_DIR` to choose another absolute path):
 | CA private key | `$MQTT_DIR/certs/ca/ca.key` | Signing only; mode `0600`, owned by `root:root`, never copied off the VPS. |
 | CA certificate | `$MQTT_DIR/certs/ca/ca.crt` | Trust anchor copied to MQTT clients. |
 | Broker key/certificate | `$MQTT_DIR/certs/broker/server.{key,crt}` | Mosquitto's server-side TLS identity. |
-| Device identity | `$MQTT_DIR/certs/devices/<device-id>/client.{key,crt}` | One client key/certificate pair per ESP32 or service. |
+| Device identity | `$MQTT_DIR/certs/devices/<mac-address>/client.{key,crt}` | One client key/certificate pair per ESP32; the MAC address is the permanent identity. |
 
-Run `deploy/issue-device-cert.sh <device-id>` as root for each future device. It is idempotent for
-an existing device ID and refuses to overwrite a partial identity. The `garage-api` identity is
+Run `deploy/issue-device-cert.sh <mac-address>` as root for each future device. It accepts a
+12-digit MAC address with or without `:` separators, is idempotent for an existing MAC identity,
+and refuses to overwrite a partial identity. The existing `garage-door-esp32` certificate is not
+changed retroactively. The `garage-api` identity is
 created by `setup.sh`; the API is therefore a normal certificate-holding MQTT client.
 
 The issuer prints the three files to copy to the device: `ca.crt`, that device's `client.crt`, and
@@ -50,14 +52,19 @@ of that output and must remain on the VPS.
 
 ## MQTT contract
 
-The topic contract is unchanged; only transport and authentication moved to the VPS:
+The v1 topic contract is MAC-scoped so the API can authorize each registered device
+end-to-end. Earlier global topics are retained only in the historical v0 document:
 
 | Topic | Direction | Payload | Retained? | Notes |
 |---|---|---|---|---|
-| `garage/door/state` | ESP32 → Python service | `{"state":"open\|closed\|unknown","ts":...}` | yes | Retained so the service sees the last known state immediately. |
-| `garage/door/cmd` | Python service → ESP32 | `{"cmd":"open\|close","id":"uuid"}` | no | Never retained; `id` matches a later ack. |
-| `garage/door/cmd/ack` | ESP32 → Python service | `{"id":"uuid","result":"triggered\|error"}` | no | `triggered` confirms the relay fired; actual state still comes from `state`. |
-| `garage/door/lwt` | ESP32 → Python service (broker-managed) | `{"online":false}` | yes | MQTT last will, published when the ESP32 drops off Wi-Fi. |
+| `garage/door/<mac>/state` | ESP32 → Python service | `{"state":"open\|closed\|unknown","ts":...}` | yes | MAC-scoped and retained so the service sees the last known state immediately. |
+| `garage/door/<mac>/cmd` | Python service → ESP32 | `{"cmd":"open\|close","id":"uuid"}` | no | Never retained; `id` matches a later ack. |
+| `garage/door/<mac>/cmd/ack` | ESP32 → Python service | `{"id":"uuid","result":"triggered\|error"}` | no | `triggered` confirms the relay fired; actual state still comes from `state`. |
+| `garage/door/<mac>/lwt` | ESP32 → Python service (broker-managed) | `{"online":false}` | yes | MQTT last will, published when the ESP32 drops off Wi-Fi. |
+
+`<mac>` is the lower-case, separator-free hardware MAC. The API authorizes a user against the
+registered MAC before reading state or publishing a command; the topic scope carries that same
+identity through MQTT.
 
 ## Mosquitto security
 
@@ -80,7 +87,23 @@ client certificate fails.
 |---|---|---|---|
 | `/door/state` | `GET` | `{"state":"open\|closed\|unknown","online":true,"ts":...}` | Served from the service's in-memory value. |
 | `/door/open`, `/door/close` | `POST` | `{"result":"triggered\|error","id":"uuid"}` | Service publishes `cmd` and waits briefly for `cmd/ack`. |
+| `/devices/register` | `POST` | `{"mac_address":"aabbccddeeff","display_name":...}` | Registers one MAC to the authenticated Apple user; a MAC cannot be claimed by another user. |
+| `/devices/<mac>/events` | `GET` | Paginated command and state-change events | Requires ownership; use `limit` and `offset` query parameters. |
 | `/door/events` *(optional, later)* | SSE/WS | stream of state changes | Nice-to-have; polling remains sufficient for v1. |
+
+The `users` table is keyed by Apple's stable `sub`. The app forwards the email and display name
+from `ASAuthorizationAppleIDCredential` only when Apple provides them on the first authorization;
+the API stores them only on the initial user insert. Accounts that predate this capture have null
+metadata and Apple cannot backfill it later. Device registration and event history are stored in
+PostgreSQL; the compose deployment provisions a dedicated `postgres:16-alpine` container and
+`garage-postgres-data` volume.
+
+The add-device flow has no factory-reset action yet. Clearing saved WiFi credentials for a change
+of ownership is a follow-up hardware feature.
+
+Devices flashed with the earlier global-topic firmware must be reflashed with the MAC-scoped
+firmware and registered before they can use the v1 API; the existing `garage-door-esp32`
+certificate remains unchanged until that deliberate migration.
 
 HTTP is terminated by the shared VPS nginx site in `deploy/nginx/garage-api.conf`, using the existing
 `*.proximadigital.app` origin certificate and proxying to `garage-door-api:8000` over
@@ -94,14 +117,14 @@ HTTP is terminated by the shared VPS nginx site in `deploy/nginx/garage-api.conf
   watches `state` to distinguish relay acknowledgement from door movement.
 - **Broker or API restarts:** both reconnect with backoff; the service resubscribes and receives the
   retained state after reconnect.
-- **Certificate replacement:** issue a new device identity with a new device ID, flash it later,
-  then retire the old device identity through the operational certificate inventory. The CA is not
-  copied to devices.
+- **Certificate replacement:** issue a new device identity for the device MAC, flash it later,
+ then retire the old device identity through the operational certificate inventory. The CA is not
+ copied to devices.
 
 ## Operational boundaries
 
 - This repository change prepares the VPS deployment; it does not deploy to the VPS.
 - The home-server deployment remains running for the captain's deliberate cutover and is not changed
   by this architecture.
-- ESP32 firmware and hardware flashing are a later task. This repository does not generate or embed
-  a certificate into `esp32/`.
+- ESP32 certificate flashing remains a manufacturing/operator step. This repository does not
+  generate or embed a certificate into `esp32/`.

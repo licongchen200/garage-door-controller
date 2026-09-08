@@ -12,6 +12,20 @@ struct AppleAuthResponse: Decodable {
     }
 }
 
+private struct AppleAuthRequestBody: Encodable {
+    let identityToken: String
+    let appleUserID: String
+    let email: String?
+    let fullName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case identityToken = "identity_token"
+        case appleUserID = "apple_user_id"
+        case email
+        case fullName = "full_name"
+    }
+}
+
 struct DoorStateResponse: Decodable {
     let state: DoorState
     let online: Bool
@@ -36,6 +50,28 @@ struct DoorStateResponse: Decodable {
 struct DoorCommandResponse: Decodable {
     let result: String
     let id: String
+}
+
+struct DeviceRegistrationResponse: Decodable {
+    let macAddress: String
+    let displayName: String?
+    let registeredAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case macAddress = "mac_address"
+        case displayName = "display_name"
+        case registeredAt = "registered_at"
+    }
+}
+
+private struct DeviceRegistrationRequest: Encodable {
+    let macAddress: String
+    let displayName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case macAddress = "mac_address"
+        case displayName = "display_name"
+    }
 }
 
 enum DoorState: String, Codable {
@@ -76,8 +112,18 @@ struct APIClient {
         return URL(string: "https://garage.example.invalid")!
     }
 
-    func signInWithApple(identityToken: String, userID: String) async throws -> AppleAuthResponse {
-        let body = ["identity_token": identityToken, "apple_user_id": userID]
+    func signInWithApple(
+        identityToken: String,
+        userID: String,
+        email: String? = nil,
+        fullName: String? = nil
+    ) async throws -> AppleAuthResponse {
+        let body = AppleAuthRequestBody(
+            identityToken: identityToken,
+            appleUserID: userID,
+            email: email,
+            fullName: fullName
+        )
         return try await send(path: "/auth/apple", method: "POST", body: body, token: nil)
     }
 
@@ -88,6 +134,15 @@ struct APIClient {
     func sendCommand(_ command: DoorState, token: String) async throws -> DoorCommandResponse {
         let path = command == .open ? "/door/open" : "/door/close"
         return try await send(path: path, method: "POST", body: Optional<String>.none, token: token)
+    }
+
+    func registerDevice(
+        macAddress: String,
+        displayName: String? = nil,
+        token: String
+    ) async throws -> DeviceRegistrationResponse {
+        let body = DeviceRegistrationRequest(macAddress: macAddress, displayName: displayName)
+        return try await send(path: "/devices/register", method: "POST", body: body, token: token)
     }
 
     private func send<Body: Encodable, Response: Decodable>(

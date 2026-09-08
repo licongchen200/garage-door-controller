@@ -14,6 +14,7 @@ targets:
       properties:
         com.apple.developer.applesignin:
           - Default
+        com.apple.developer.networking.HotspotConfiguration: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.licongchen.home
@@ -33,6 +34,9 @@ targets:
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         APIBaseURL: https://iot.proximadigital.app
+        NSLocalNetworkUsageDescription: Garage Door uses your local network to set up a new controller.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         # The app only uses standard HTTPS (URLSession/TLS) - no custom or
         # proprietary encryption - so it qualifies for the standard export
         # exemption. Declaring this upfront means every future build skips
@@ -41,3 +45,14 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+  GarageDoorTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: GarageDoorTests
+    dependencies:
+      - target: GarageDoor
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.licongchen.home.tests
+        SWIFT_VERSION: "5.9"

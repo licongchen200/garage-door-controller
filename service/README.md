@@ -11,6 +11,11 @@ required; the service refuses to start without them. `APPLE_BUNDLE_ID` must equa
 bundle ID. The API JWT uses **HS256** and lasts exactly **30 days** (`JWT_TTL_DAYS=30`). Keep the
 secret only on the API host; never put it in the iOS app.
 
+The service stores users, registered devices, and paginated operation history in PostgreSQL. The
+deployment compose file starts a dedicated `postgres:16-alpine` service with a named volume and
+loads the initial schema from [`app/schema.sql`](app/schema.sql). `DATABASE_URL` comes from
+`deploy/.env`; the service creates the schema idempotently at startup after PostgreSQL is healthy.
+
 The MQTT client uses paho-mqtt with the CA certificate and `garage-api` client certificate mounted
 by compose at `/run/mqtt-certs/`. It subscribes to the topics in
 [`docs/architecture/v1-python-api-bridge.md`](../docs/architecture/v1-python-api-bridge.md). It
@@ -31,7 +36,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 The API must be deployed behind HTTPS. The in-memory command rate limiter defaults to five commands
-per user per 60 seconds; it is intended for this single-process, single-user deployment.
+per user per 60 seconds; it is intended for this single-process deployment.
 
 On the VPS, run `sudo deploy/setup.sh` once to create the private CA, broker identity, and
 `garage-api` client identity, then use `deploy/deploy.sh` for the API image. The CA private key is

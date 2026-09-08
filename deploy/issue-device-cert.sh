@@ -8,13 +8,17 @@
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
-  echo "usage: $0 <device-id>" >&2
+  echo "usage: $0 <mac-address> (or the reserved garage-api service identity)" >&2
   exit 2
 fi
 
-DEVICE_ID="$1"
-if [[ ! "$DEVICE_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-  echo "error: device-id must contain only letters, numbers, '.', '_' or '-' and start with an alphanumeric character" >&2
+SUPPLIED_ID="$1"
+if [ "$SUPPLIED_ID" = "garage-api" ]; then
+  DEVICE_ID="$SUPPLIED_ID"
+elif [[ "$SUPPLIED_ID" =~ ^([A-Fa-f0-9]{2}:){5}[A-Fa-f0-9]{2}$ || "$SUPPLIED_ID" =~ ^[A-Fa-f0-9]{12}$ ]]; then
+  DEVICE_ID="$(printf '%s' "${SUPPLIED_ID//:/}" | tr '[:upper:]' '[:lower:]')"
+else
+  echo "error: new device certificates must use the device MAC address (12 hex digits, with optional ':' separators)" >&2
   exit 2
 fi
 
@@ -96,5 +100,5 @@ echo "  Client private key:   $CLIENT_KEY"
 echo
 echo "Connection settings:"
 echo "  Broker endpoint:      ${MQTT_ENDPOINT:-<vps-public-host-or-ip>}:8883"
-echo "  MQTT identity:        $DEVICE_ID"
+echo "  MQTT identity (MAC):  $DEVICE_ID"
 echo "  MQTT password:        none (mutual TLS only)"

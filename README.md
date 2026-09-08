@@ -7,7 +7,7 @@ home-server MQTT broker are documented in [`esp32/`](esp32/); physical wiring re
 repo.
 
 - [`ios/`](ios/) — SwiftUI app using Sign in with Apple, Keychain, and HTTPS polling.
-- [`service/`](service/) — FastAPI service issuing app JWTs and bridging REST to VPS MQTT over mTLS.
+- [`service/`](service/) — FastAPI service issuing app JWTs, persisting users/devices/history in PostgreSQL, and bridging REST to VPS MQTT over mTLS.
 - [`esp32/`](esp32/) — PlatformIO ESP32-C3 firmware and Wokwi LED simulation.
 
 See [`service/README.md`](service/README.md) for configuration and local startup instructions.
@@ -27,9 +27,15 @@ See [`deploy/`](deploy/) for the Docker Compose setup:
 
 - `deploy/setup.sh` — one-time per VPS: creates the private CA, broker certificate, `garage-api` client
   certificate, TLS-only Mosquitto configuration, and starts the broker on port `8883`.
-- `deploy/issue-device-cert.sh <device-id>` — idempotently issues a separate client certificate/key
-  pair for each future MQTT device without exposing the CA private key.
+ pair for each future MQTT device without exposing the CA private key.
+- `deploy/issue-device-cert.sh <mac-address>` — idempotently issues a separate client certificate/key
+  pair for each future MQTT device, keyed by its permanent hardware MAC, without exposing the CA
+  private key.
 - `deploy/deploy.sh` — run this whenever the service code changes: pulls, rebuilds, and restarts just
   the `garage-door-api` container.
+
+The compose deployment also runs a dedicated `postgres:16-alpine` database with the `garage-postgres-data`
+volume. Set `POSTGRES_*` and `DATABASE_URL` in `deploy/.env`; existing accounts created before user
+metadata capture shipped may have no stored Apple email or name, and Apple cannot provide those fields again.
 
 Both assume `deploy/.env` already exists (copy `deploy/.env.example` and fill in real values first).
