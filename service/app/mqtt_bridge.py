@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import ssl
 import threading
 import uuid
 from dataclasses import dataclass
@@ -47,9 +49,20 @@ class MqttBridge:
         with self._lock:
             if self._started:
                 return
+            for name, path in (
+                ("MQTT_CA_FILE", self.settings.mqtt_ca_file),
+                ("MQTT_CERT_FILE", self.settings.mqtt_cert_file),
+                ("MQTT_KEY_FILE", self.settings.mqtt_key_file),
+            ):
+                if not path or not os.path.isfile(path):
+                    raise RuntimeError(f"{name} must point to an existing TLS file")
             client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-            if self.settings.mqtt_username:
-                client.username_pw_set(self.settings.mqtt_username, self.settings.mqtt_password)
+            client.tls_set(
+                ca_certs=self.settings.mqtt_ca_file,
+                certfile=self.settings.mqtt_cert_file,
+                keyfile=self.settings.mqtt_key_file,
+                tls_version=ssl.PROTOCOL_TLS_CLIENT,
+            )
             client.reconnect_delay_set(min_delay=1, max_delay=60)
             client.on_connect = self._on_connect
             client.on_message = self._on_message
