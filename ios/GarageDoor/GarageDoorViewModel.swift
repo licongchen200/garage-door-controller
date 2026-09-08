@@ -59,6 +59,8 @@ final class GarageDoorViewModel: ObservableObject {
         }
     }
 
+    var apiClient: APIClient { api }
+
     var displayedState: String {
         guard online else { return "Unreachable" }
         return doorState.title
@@ -74,9 +76,14 @@ final class GarageDoorViewModel: ObservableObject {
                   let identityToken = String(data: tokenData, encoding: .utf8) else {
                 throw APIError.server("Sign in with Apple did not return an identity token.")
             }
+            let fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+                .compactMap { $0 }
+                .joined(separator: " ")
             let response = try await api.signInWithApple(
                 identityToken: identityToken,
-                userID: credential.user
+                userID: credential.user,
+                email: credential.email,
+                fullName: fullName.isEmpty ? nil : fullName
             )
             try auth.store(token: response.accessToken, appleUserID: response.appleUserID)
             errorMessage = nil

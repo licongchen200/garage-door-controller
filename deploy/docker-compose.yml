@@ -7,6 +7,24 @@ networks:
     external: true
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks:
+      - garage-network
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-garage}
+      POSTGRES_USER: ${POSTGRES_USER:-garage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in deploy/.env}
+    volumes:
+      - garage-postgres-data:/var/lib/postgresql/data
+      - ../service/app/schema.sql:/docker-entrypoint-initdb.d/001-garage-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
   mosquitto:
     image: eclipse-mosquitto:2
     restart: unless-stopped
@@ -26,6 +44,9 @@ services:
     restart: unless-stopped
     networks:
       - garage-network
+    depends_on:
+      postgres:
+        condition: service_healthy
     expose:
       - "8000"
     env_file:
@@ -39,7 +60,11 @@ services:
       MQTT_CA_FILE: /run/mqtt-certs/ca.crt
       MQTT_CERT_FILE: /run/mqtt-certs/client.crt
       MQTT_KEY_FILE: /run/mqtt-certs/client.key
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set in deploy/.env}
     volumes:
       - ${MQTT_DIR:-~/mqtt}/certs/ca/ca.crt:/run/mqtt-certs/ca.crt:ro
       - ${MQTT_DIR:-~/mqtt}/certs/devices/garage-api/client.crt:/run/mqtt-certs/client.crt:ro
       - ${MQTT_DIR:-~/mqtt}/certs/devices/garage-api/client.key:/run/mqtt-certs/client.key:ro
+
+volumes:
+  garage-postgres-data:

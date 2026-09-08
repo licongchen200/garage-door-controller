@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var model = GarageDoorViewModel()
+    @State private var showingAddDevice = false
 
     var body: some View {
         NavigationStack {
@@ -107,6 +108,16 @@ struct ContentView: View {
 
                     Spacer(minLength: 12)
 
+                    Button {
+                        showingAddDevice = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.headline.weight(.bold))
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Add a device")
+                    .accessibilityHint("Opens Wi-Fi setup for a new garage door controller.")
+
                     ConnectionPill(isOnline: model.online)
                 }
                 .padding(.top, 18)
@@ -186,6 +197,11 @@ struct ContentView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
+        .sheet(isPresented: $showingAddDevice) {
+            AddDeviceView(api: model.apiClient, token: model.auth.appToken) {
+                Task { await model.refresh() }
+            }
+        }
     }
 
     private var actionEnabled: Bool {
@@ -210,7 +226,7 @@ struct ContentView: View {
     }
 }
 
-private struct GarageBackground: View {
+struct GarageBackground: View {
     var body: some View {
         ZStack {
             LinearGradient(
@@ -338,7 +354,7 @@ private struct StateCard: View {
     }
 }
 
-private struct ErrorMessage: View {
+struct ErrorMessage: View {
     let message: String
 
     var body: some View {
@@ -362,7 +378,7 @@ private struct ErrorMessage: View {
     }
 }
 
-private struct GaragePrimaryButtonStyle: ButtonStyle {
+struct GaragePrimaryButtonStyle: ButtonStyle {
     let isEnabled: Bool
 
     func makeBody(configuration: Configuration) -> some View {
@@ -385,7 +401,7 @@ private struct GaragePrimaryButtonStyle: ButtonStyle {
     }
 }
 
-private enum GaragePalette {
+enum GaragePalette {
     static let navy = Color(red: 0.035, green: 0.055, blue: 0.15)
     static let indigo = Color(red: 0.09, green: 0.10, blue: 0.27)
     static let surface = Color.white.opacity(0.10)

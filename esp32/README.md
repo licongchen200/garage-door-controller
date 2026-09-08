@@ -6,16 +6,21 @@ See [`docs/sensor-relay-wiring.md`](docs/sensor-relay-wiring.md) for the impleme
 
 ## Configuration
 
-Copy `include/config.example.h` to `include/config.h`, then set the WiFi and MQTT values:
+Copy `include/config.example.h` to `include/config.h` for the MQTT/TLS values used by a
+development device:
 
 ```sh
 cd esp32
 cp include/config.example.h include/config.h
 ```
 
-`include/config.h` is gitignored. Do not commit credentials. The `wokwi` environment has safe
-development defaults (`Wokwi-GUEST` and `broker.hivemq.com`) when no config header is present;
-use a private broker and a local `config.h` when testing the real MQTT contract.
+`include/config.h` is gitignored. Do not commit credentials. WiFi credentials are not required
+for a shipped device: on first boot WiFiManager creates an open setup network named
+`GarageDoor-Setup-<last four MAC characters>` and stores credentials in persistent flash after
+they are submitted. The iOS app joins that network and submits them. A `WIFI_SSID`/
+`WIFI_PASSWORD` pair in the ignored header is an optional captain-only development default and is
+used only when WiFiManager has no saved credentials. The `wokwi` environment retains safe
+development defaults (`Wokwi-GUEST` and `broker.hivemq.com`) when no config header is present.
 
 The door indicator uses the ESP32-C3 Super Mini's onboard plain blue LED on **GPIO8**. It is lit
 when the sensor-derived state is `open` and off when `closed`; it is not an RGB LED. During
@@ -56,8 +61,8 @@ reachable from the simulator; `localhost` inside Wokwi is not the host machine.
 The CLI requires a Wokwi CI token in `WOKWI_CLI_TOKEN`; the VS Code extension can be used without
 that CLI token. `wokwi-cli lint` checks the diagram's part types and pin connections.
 
-To exercise the contract, publish commands to `garage/door/cmd` with JSON such as
+To exercise the contract, publish commands to `garage/door/<mac>/cmd` with JSON such as
 `{"cmd":"open","id":"wokwi-1"}`. The firmware publishes the matching ack on
-`garage/door/cmd/ack`, then retained state on `garage/door/state`; the retained LWT is published on
-`garage/door/lwt` and the broker will publish `{"online":false}` if the client disconnects
-unexpectedly.
+`garage/door/<mac>/cmd/ack`, retained state on `garage/door/<mac>/state`, and the retained LWT on
+`garage/door/<mac>/lwt`. `<mac>` is lower-case, separator-free, and is the same MAC identity used
+when issuing a new device certificate with `deploy/issue-device-cert.sh <mac-address>`.

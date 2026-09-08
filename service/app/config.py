@@ -20,6 +20,7 @@ class Settings:
     mqtt_cert_file: str = "/run/mqtt-certs/client.crt"
     mqtt_key_file: str = "/run/mqtt-certs/client.key"
     mqtt_ack_timeout_seconds: float = 3.0
+    database_url: str = "postgresql://garage:garage@postgres:5432/garage"
     rate_limit_max_calls: int = 5
     rate_limit_window_seconds: float = 60.0
 
@@ -40,6 +41,7 @@ class Settings:
             mqtt_cert_file=os.getenv("MQTT_CERT_FILE", cls.mqtt_cert_file),
             mqtt_key_file=os.getenv("MQTT_KEY_FILE", cls.mqtt_key_file),
             mqtt_ack_timeout_seconds=float(os.getenv("MQTT_ACK_TIMEOUT_SECONDS", "3")),
+            database_url=os.getenv("DATABASE_URL", cls.database_url),
             rate_limit_max_calls=int(os.getenv("RATE_LIMIT_MAX_CALLS", "5")),
             rate_limit_window_seconds=float(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
         )

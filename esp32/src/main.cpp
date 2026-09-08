@@ -2,8 +2,11 @@
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include <WiFiManager.h>
 
 #include <time.h>
+
+#include "wifi_provisioning.h"
 
 #if __has_include("config.h")
 #include "config.h"
@@ -51,23 +54,24 @@ static constexpr uint8_t RELAY_INACTIVE_LEVEL = HIGH;
 static constexpr unsigned long RELAY_PULSE_MS = 500;
 static constexpr size_t RELAY_QUEUE_CAPACITY = 8;
 
-static constexpr char CMD_TOPIC[] = "garage/door/cmd";
-static constexpr char ACK_TOPIC[] = "garage/door/cmd/ack";
-static constexpr char STATE_TOPIC[] = "garage/door/state";
-static constexpr char LWT_TOPIC[] = "garage/door/lwt";
 static constexpr char LWT_ONLINE[] = R"({"online":true})";
 static constexpr char LWT_OFFLINE[] = R"({"online":false})";
 
-static constexpr unsigned long WIFI_RETRY_MS = 10000;
 static constexpr unsigned long MQTT_RETRY_MS = 5000;
 
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
+WiFiManager wifiManager;
 const char *doorState = "unknown";
-unsigned long lastWifiAttempt = 0;
 unsigned long lastMqttAttempt = 0;
 bool ntpConfigured = false;
 bool lastKnownDoorWasOpen = false;
+String deviceMac;
+String commandTopic;
+String ackTopic;
+String stateTopic;
+String lwtTopic;
+String deviceMetadata;
 
 struct RelayCommand {
   char id[96];
@@ -81,6 +85,60 @@ bool relayPulseActive = false;
 unsigned long relayPulseStartedAt = 0;
 
 bool publishState();
+
+String normalizedMacAddress() {
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");
+  mac.toLowerCase();
+  return mac;
+}
+
+String setupAccessPointName() {
+  String suffix = deviceMac.substring(deviceMac.length() > 4 ? deviceMac.length() - 4 : 0);
+  suffix.toUpperCase();
+  return String("GarageDoor-Setup-") + suffix;
+}
+
+void configureMqttTopics() {
+  commandTopic = String("garage/door/") + deviceMac + "/cmd";
+  ackTopic = String("garage/door/") + deviceMac + "/cmd/ack";
+  stateTopic = String("garage/door/") + deviceMac + "/state";
+  lwtTopic = String("garage/door/") + deviceMac + "/lwt";
+}
+
+void startWifiProvisioning() {
+  const bool savedCredentials = wifiManager.getWiFiIsSaved();
+  const bool hasCompileTimeDefaults = WIFI_SSID[0] != '\0';
+  const garage_door::WifiStartupPath startupPath =
+      garage_door::wifiStartupPath(savedCredentials, hasCompileTimeDefaults);
+
+  // WiFiManager's autoconnect always tries NVS credentials before opening its
+  // portal. Only preload config.h values when NVS is empty; a dev default must
+  // never replace credentials that the device owner already saved.
+  if (startupPath == garage_door::WifiStartupPath::compileTimeDefaults) {
+    wifiManager.preloadWiFi(WIFI_SSID, WIFI_PASSWORD);
+    Serial.printf("no saved WiFi credentials; trying development default %s first\n", WIFI_SSID);
+  } else if (startupPath == garage_door::WifiStartupPath::savedCredentials) {
+    Serial.println("trying saved WiFi credentials first");
+  } else {
+    Serial.println("no WiFi credentials saved; starting setup portal");
+  }
+
+  wifiManager.setConnectTimeout(10);
+  wifiManager.setSaveConnectTimeout(10);
+  wifiManager.setConnectRetries(3);
+
+  // WiFiManager keeps this pointer for every portal page, so the backing String
+  // must outlive this function.
+  deviceMetadata = String("<meta name=\"garage-device-mac\" content=\"") + deviceMac +
+                   String("\">");
+  wifiManager.setCustomHeadElement(deviceMetadata.c_str());
+
+  const String apName = setupAccessPointName();
+  if (!wifiManager.autoConnect(apName.c_str())) {
+    Serial.println("WiFi setup portal ended without a connection");
+  }
+}
 
 void setLedForState() {
   // The ESP32-C3 Super Mini onboard LED is active-low: LOW turns it on.
@@ -135,7 +193,7 @@ bool publishState() {
 
   char payload[96];
   serializeJson(document, payload, sizeof(payload));
-  const bool published = mqttClient.publish(STATE_TOPIC, payload, true);
+  const bool published = mqttClient.publish(stateTopic.c_str(), payload, true);
   if (published) {
     Serial.printf("-> state: %s\n", doorState);
   }
@@ -149,7 +207,7 @@ void publishAck(const char *commandId, const char *result = "triggered") {
 
   char payload[128];
   serializeJson(document, payload, sizeof(payload));
-  mqttClient.publish(ACK_TOPIC, payload);
+  mqttClient.publish(ackTopic.c_str(), payload);
 }
 
 bool enqueueRelayCommand(const char *commandId) {
@@ -200,7 +258,7 @@ void serviceRelayPulse() {
 }
 
 void onMqttMessage(char *topic, byte *payload, unsigned int length) {
-  if (strcmp(topic, CMD_TOPIC) != 0) {
+  if (strcmp(topic, commandTopic.c_str()) != 0) {
     return;
   }
 
@@ -235,10 +293,10 @@ String mqttClientId() {
 }
 
 void announceMqttConnection() {
-  mqttClient.subscribe(CMD_TOPIC);
-  mqttClient.publish(LWT_TOPIC, LWT_ONLINE, true);
+  mqttClient.subscribe(commandTopic.c_str());
+  mqttClient.publish(lwtTopic.c_str(), LWT_ONLINE, true);
   publishState();
-  Serial.printf("connected - subscribing to %s\n", CMD_TOPIC);
+  Serial.printf("connected - subscribing to %s\n", commandTopic.c_str());
 }
 
 void connectMqttIfNeeded() {
@@ -252,10 +310,10 @@ void connectMqttIfNeeded() {
   const String clientId = mqttClientId();
   bool connected;
   if (MQTT_USERNAME[0] != '\0') {
-    connected = mqttClient.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD, LWT_TOPIC, 0,
+    connected = mqttClient.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD, lwtTopic.c_str(), 0,
                                    true, LWT_OFFLINE);
   } else {
-    connected = mqttClient.connect(clientId.c_str(), LWT_TOPIC, 0, true, LWT_OFFLINE);
+    connected = mqttClient.connect(clientId.c_str(), lwtTopic.c_str(), 0, true, LWT_OFFLINE);
   }
 
   if (connected) {
@@ -263,23 +321,6 @@ void connectMqttIfNeeded() {
   } else {
     Serial.printf("MQTT connect failed, state=%d\n", mqttClient.state());
   }
-}
-
-void startWifiIfNeeded() {
-  if (WiFi.status() == WL_CONNECTED) {
-    if (!ntpConfigured) {
-      configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-      ntpConfigured = true;
-    }
-    return;
-  }
-  if (WIFI_SSID[0] == '\0' || millis() - lastWifiAttempt < WIFI_RETRY_MS) {
-    return;
-  }
-
-  lastWifiAttempt = millis();
-  Serial.printf("connecting to WiFi %s ...\n", WIFI_SSID);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
 
 void setup() {
@@ -295,15 +336,20 @@ void setup() {
   mqttClient.setCallback(onMqttMessage);
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
-  startWifiIfNeeded();
+  deviceMac = normalizedMacAddress();
+  configureMqttTopics();
+  startWifiProvisioning();
 
-  if (WIFI_SSID[0] == '\0' || MQTT_HOST[0] == '\0') {
-    Serial.println("WiFi/MQTT not configured; firmware is offline until include/config.h is added");
+  if (MQTT_HOST[0] == '\0') {
+    Serial.println("MQTT not configured; firmware is offline until include/config.h is added");
   }
 }
 
 void loop() {
-  startWifiIfNeeded();
+  if (WiFi.status() == WL_CONNECTED && !ntpConfigured) {
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    ntpConfigured = true;
+  }
   connectMqttIfNeeded();
   pollDoorSensors();
   serviceRelayPulse();

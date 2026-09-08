@@ -11,12 +11,19 @@ MQTT_DIR="$TEST_ROOT/mqtt"
 SUB_LOG="$TEST_ROOT/sub.log"
 GARAGE_API_ENV_FILE="$TEST_ROOT/api.env"
 NETWORK_CREATED=0
+TEST_DEVICE_MAC="aabbccddeeff"
 
 cat > "$GARAGE_API_ENV_FILE" <<'EOF'
 JWT_SECRET=local-integration-test-secret-local-integration-test
 APPLE_BUNDLE_ID=org.example.garage
 EOF
 export GARAGE_API_ENV_FILE
+# Compose interpolates the complete file even though this test starts only Mosquitto.
+# Supply disposable database settings so the test remains independent of deploy/.env.
+export POSTGRES_DB=garage
+export POSTGRES_USER=garage
+export POSTGRES_PASSWORD=local-mqtt-test-password
+export DATABASE_URL=postgresql://garage:local-mqtt-test-password@postgres:5432/garage
 
 cleanup() {
   MQTT_DIR="$MQTT_DIR" docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true
@@ -46,7 +53,7 @@ test "$CA_KEY_SHA" = "$(shasum -a 256 "$MQTT_DIR/certs/ca/ca.key" | cut -d' ' -f
 test "$CA_CERT_SHA" = "$(shasum -a 256 "$MQTT_DIR/certs/ca/ca.crt" | cut -d' ' -f1)"
 
 MQTT_DIR="$MQTT_DIR" GARAGE_MQTT_ALLOW_NON_ROOT=1 \
-  "$SCRIPT_DIR/issue-device-cert.sh" integration-device >/dev/null
+  "$SCRIPT_DIR/issue-device-cert.sh" "$TEST_DEVICE_MAC" >/dev/null
 
 MQTT_DIR="$MQTT_DIR" docker compose -f "$COMPOSE_FILE" up -d mosquitto >/dev/null
 for _ in $(seq 1 30); do
@@ -90,15 +97,15 @@ fi
 
 docker run --rm "${CLIENT_MOUNTS[@]}" "$CLIENT_IMAGE" mosquitto_sub \
   -h mosquitto -p 8883 --cafile /certs/ca/ca.crt \
-  --cert /certs/devices/integration-device/client.crt \
-  --key /certs/devices/integration-device/client.key \
+  --cert "/certs/devices/$TEST_DEVICE_MAC/client.crt" \
+  --key "/certs/devices/$TEST_DEVICE_MAC/client.key" \
   -t garage/test/accepted -C 1 -W 10 -v > "$SUB_LOG" 2>&1 &
 SUB_PID=$!
 sleep 1
 docker run --rm "${CLIENT_MOUNTS[@]}" "$CLIENT_IMAGE" mosquitto_pub \
   -h mosquitto -p 8883 --cafile /certs/ca/ca.crt \
-  --cert /certs/devices/integration-device/client.crt \
-  --key /certs/devices/integration-device/client.key \
+  --cert "/certs/devices/$TEST_DEVICE_MAC/client.crt" \
+  --key "/certs/devices/$TEST_DEVICE_MAC/client.key" \
   -t garage/test/accepted -m accepted
 wait "$SUB_PID"
 grep -Fq 'garage/test/accepted accepted' "$SUB_LOG"
