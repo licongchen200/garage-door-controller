@@ -84,7 +84,7 @@ else
 basicConstraints = critical, CA:false
 keyUsage = critical, digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth
-subjectAltName = DNS:mosquitto, DNS:localhost, IP:127.0.0.1
+subjectAltName = DNS:mosquitto, DNS:localhost, DNS:mqtt.proximadigital.app, IP:127.0.0.1
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer
 EOF
