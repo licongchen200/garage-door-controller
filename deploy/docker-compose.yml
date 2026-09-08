@@ -13,9 +13,10 @@ services:
     networks:
       - garage-network
     ports:
-      - "1883:1883"
+      - "8883:8883"
     volumes:
       - ${MQTT_DIR:-~/mqtt}/config:/mosquitto/config
+      - ${MQTT_DIR:-~/mqtt}/certs:/mosquitto/certs:ro
       - ${MQTT_DIR:-~/mqtt}/data:/mosquitto/data
       - ${MQTT_DIR:-~/mqtt}/log:/mosquitto/log
 
@@ -25,12 +26,20 @@ services:
     restart: unless-stopped
     networks:
       - garage-network
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     env_file:
-      - .env
+      - ${GARAGE_API_ENV_FILE:-.env}
     environment:
       # Resolve the broker by container name on garage-network, whether it's
       # this compose file's own "mosquitto" service or an existing standalone
       # broker container that setup.sh joined onto the same network.
       MQTT_HOST: mosquitto
+      MQTT_PORT: "8883"
+      MQTT_CA_FILE: /run/mqtt-certs/ca.crt
+      MQTT_CERT_FILE: /run/mqtt-certs/client.crt
+      MQTT_KEY_FILE: /run/mqtt-certs/client.key
+    volumes:
+      - ${MQTT_DIR:-~/mqtt}/certs/ca/ca.crt:/run/mqtt-certs/ca.crt:ro
+      - ${MQTT_DIR:-~/mqtt}/certs/devices/garage-api/client.crt:/run/mqtt-certs/client.crt:ro
+      - ${MQTT_DIR:-~/mqtt}/certs/devices/garage-api/client.key:/run/mqtt-certs/client.key:ro

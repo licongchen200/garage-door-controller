@@ -1,85 +1,107 @@
-# Architecture v1 — Python API bridge (current)
+# Architecture v1 — Python API bridge with VPS MQTT mutual TLS (current)
 
-One environment, no dev/prod split — this is a small personal project. ESP32 hardware and the
-home-server MQTT broker are the captain's own; this repo is the iOS app side.
+This is the current server-side deployment. The MQTT broker and Python API run on the VPS. The
+ESP32 connects to the broker over directly exposed MQTTS port `8883`, while the iOS app continues
+to use HTTPS to the API at `iot.proximadigital.app`.
 
-MQTT stays local-only. A small Python service on the home server bridges it to a REST API, so only
-that API (not raw MQTT) is ever exposed to the internet.
+The broker deliberately does not go through nginx: nginx handles HTTP, and Mosquitto terminates
+MQTT TLS itself. Every MQTT client has its own certificate signed by this project's private CA.
+There is no MQTT password file and no shared MQTT password.
 
 ## Overview
 
 ```mermaid
 flowchart LR
-    subgraph local["home network — local only"]
-        ESP32["ESP32\nreed switch + relay"]
-        Broker["MQTT Broker\nLAN only, never\nexposed to internet"]
-        Py["Python API service\nbridges REST <-> MQTT"]
-        ESP32 -- "pub state" --> Broker
-        Broker -- "sub cmd" --> ESP32
-        Broker -- "sub state" --> Py
-        Py -- "pub cmd" --> Broker
-    end
     App["iOS App\nanywhere"]
-    Py -- "HTTPS only,\nexposed to internet" --- App
+    Nginx["Shared nginx\nHTTPS\niot.proximadigital.app"]
+    API["Python API\nDocker container"]
+    Broker["Mosquitto\nVPS :8883\nMQTTS + client certs"]
+    ESP32["ESP32\nper-device client cert"]
+
+    App -- "HTTPS" --> Nginx
+    Nginx --> API
+    API -- "mTLS over garage-network" --> Broker
+    ESP32 -- "mTLS over internet" --> Broker
 ```
 
-Neither the ESP32 nor the app ever talk to MQTT across the internet. Only the Python service's HTTPS
-port is ever exposed — no broker port forwarding, no MQTT credentials anywhere on the phone.
+The VPS firewall and provider security group must allow TCP `8883` to the broker. The shared nginx
+container joins `garage-network` so it can proxy HTTP to `garage-door-api:8000`; MQTT never passes
+through nginx.
 
-## Local MQTT contract (ESP32 ↔ Python service)
+## Private CA and client identities
 
-Entirely on the home network — the iOS app never sees these topics directly.
+`deploy/setup.sh` creates the CA once and is safe to re-run. On the VPS, the state directory defaults
+to `$HOME/mqtt` (set `MQTT_DIR` to choose another absolute path):
+
+| Artifact | Host path | Use |
+|---|---|---|
+| CA private key | `$MQTT_DIR/certs/ca/ca.key` | Signing only; mode `0600`, owned by `root:root`, never copied off the VPS. |
+| CA certificate | `$MQTT_DIR/certs/ca/ca.crt` | Trust anchor copied to MQTT clients. |
+| Broker key/certificate | `$MQTT_DIR/certs/broker/server.{key,crt}` | Mosquitto's server-side TLS identity. |
+| Device identity | `$MQTT_DIR/certs/devices/<device-id>/client.{key,crt}` | One client key/certificate pair per ESP32 or service. |
+
+Run `deploy/issue-device-cert.sh <device-id>` as root for each future device. It is idempotent for
+an existing device ID and refuses to overwrite a partial identity. The `garage-api` identity is
+created by `setup.sh`; the API is therefore a normal certificate-holding MQTT client.
+
+The issuer prints the three files to copy to the device: `ca.crt`, that device's `client.crt`, and
+that device's `client.key`, plus the broker endpoint and identity. The CA private key is never part
+of that output and must remain on the VPS.
+
+## MQTT contract
+
+The topic contract is unchanged; only transport and authentication moved to the VPS:
 
 | Topic | Direction | Payload | Retained? | Notes |
 |---|---|---|---|---|
 | `garage/door/state` | ESP32 → Python service | `{"state":"open\|closed\|unknown","ts":...}` | yes | Retained so the service sees the last known state immediately. |
 | `garage/door/cmd` | Python service → ESP32 | `{"cmd":"open\|close","id":"uuid"}` | no | Never retained; `id` matches a later ack. |
-| `garage/door/cmd/ack` | ESP32 → Python service | `{"id":"uuid","result":"triggered\|error"}` | no | "triggered" only confirms the relay fired — actual open/close still comes from `state`. |
-| `garage/door/lwt` | ESP32 → Python service (broker-managed) | `{"online":false}` | yes | MQTT "last will", published automatically if the ESP32 drops off Wi-Fi. |
+| `garage/door/cmd/ack` | ESP32 → Python service | `{"id":"uuid","result":"triggered\|error"}` | no | `triggered` confirms the relay fired; actual state still comes from `state`. |
+| `garage/door/lwt` | ESP32 → Python service (broker-managed) | `{"online":false}` | yes | MQTT last will, published when the ESP32 drops off Wi-Fi. |
 
-## REST API (Python service ↔ iOS app, over the internet)
+## Mosquitto security
+
+The checked-in broker configuration listens only on MQTTS port `8883` and requires:
+
+- `cafile` pointing at the private CA certificate;
+- `certfile` and `keyfile` pointing at the broker certificate and key;
+- `require_certificate true`, so clients without a certificate are rejected;
+- `use_identity_as_username true`, so the certificate identity is the MQTT username;
+- no `password_file`, `MQTT_USERNAME`, or `MQTT_PASSWORD` authentication path.
+
+The API uses the CA certificate plus the `garage-api` client certificate and key. It does not enable
+insecure TLS or username/password fallback. The local integration test exercises all three important
+cases: no client certificate fails, a certificate signed by this CA succeeds, and a self-signed
+client certificate fails.
+
+## REST API (Python service ↔ iOS app)
 
 | Endpoint | Method | Response / body | Notes |
 |---|---|---|---|
-| `/door/state` | `GET` | `{"state":"open\|closed\|unknown","online":true,"ts":...}` | Served from the service's in-memory value, kept current by staying subscribed locally — no MQTT round-trip per request. |
-| `/door/open`, `/door/close` | `POST` | `{"result":"triggered\|error","id":"uuid"}` | Service publishes `cmd` and waits (short timeout) for `cmd/ack` before responding. |
-| `/door/events` *(optional, later)* | SSE/WS | stream of state changes | Nice-to-have for a live-updating UI instead of polling; skippable for v1 — polling every few seconds is fine at this scale. |
+| `/door/state` | `GET` | `{"state":"open\|closed\|unknown","online":true,"ts":...}` | Served from the service's in-memory value. |
+| `/door/open`, `/door/close` | `POST` | `{"result":"triggered\|error","id":"uuid"}` | Service publishes `cmd` and waits briefly for `cmd/ack`. |
+| `/door/events` *(optional, later)* | SSE/WS | stream of state changes | Nice-to-have; polling remains sufficient for v1. |
+
+HTTP is terminated by the shared VPS nginx site in `deploy/nginx/garage-api.conf`, using the existing
+`*.proximadigital.app` origin certificate and proxying to `garage-door-api:8000` over
+`garage-network`. The retired `garage-api.licongchen.org` site is not part of this deployment.
 
 ## Reliability
 
-- **ESP32 reboots / loses Wi-Fi:** broker's last will (`lwt`) flips to offline immediately; on reconnect the ESP32 re-publishes current state as retained, so nothing needs a manual refresh.
-- **App sends "open" but nothing happens:** the service waits for `cmd/ack` to confirm the relay fired, then separately watches `state` to confirm the door actually moved — two distinct failures get two distinct messages.
-- **App reopens after being backgrounded:** treat state older than a TTL (e.g. 2 min) as `unknown` in the UI rather than trusting a possibly-stale value, until a fresh message arrives (same pattern as gps-location's presence TTL).
-- **Broker or Python service restarts:** both auto-reconnect with backoff; the Python service resubscribes and gets the retained state immediately on reconnect.
-- **App can't reach the Python service:** a distinct failure mode from "door state unknown" — home server or internet being down should show as "can't reach server," not conflated with door state.
+- **ESP32 reboots / loses Wi-Fi:** the broker's last will flips to offline; on reconnect the ESP32
+  republishes current state as retained.
+- **App sends a command but nothing happens:** the service waits for `cmd/ack`, then separately
+  watches `state` to distinguish relay acknowledgement from door movement.
+- **Broker or API restarts:** both reconnect with backoff; the service resubscribes and receives the
+  retained state after reconnect.
+- **Certificate replacement:** issue a new device identity with a new device ID, flash it later,
+  then retire the old device identity through the operational certificate inventory. The CA is not
+  copied to devices.
 
-## Security
+## Operational boundaries
 
-Keeping MQTT local-only removes the biggest risk from v0 — no broker port, no broker credentials, and
-no MQTT protocol surface exposed to the internet at all. The remaining surface is the one REST API.
-
-- **Transport:** HTTPS only for the API — a real cert (Let's Encrypt is standard for a home server with a domain/dynamic DNS name).
-- **API auth:** still needed — an unauthenticated HTTPS endpoint that opens a garage is just as risky as an unauthenticated MQTT broker. Simplest workable option: a single long-lived API token/pre-shared key sent as a header, stored in iOS Keychain. Upgrade later to per-device tokens if more users are ever added.
-- **Rate limiting:** the Python service should throttle repeated open/close attempts so a leaked token or a bug can't hammer the relay.
-- **MQTT credentials:** only the Python service holds them, on the same machine as the broker — the phone never sees an MQTT credential.
-- **App-side storage:** the API token goes in iOS Keychain, never `UserDefaults` or hardcoded in the app bundle (this repo is public).
-
-## iOS app — first-pass shape
-
-- **One screen:** a big door-state indicator (open / closed / unknown / unreachable) plus one button that reads "Open" or "Close" depending on current state.
-- **Networking:** plain `URLSession` — no MQTT library needed on the iOS side, since the app only ever speaks HTTPS to the Python service.
-- **State:** a single small observable object holding connection status + door state + last-updated time, polling `/door/state` every few seconds while foregrounded.
-
-## Python service — first-pass shape
-
-- **Framework:** a small FastAPI (or Flask) app is plenty for four endpoints.
-- **MQTT client:** `paho-mqtt` connecting to the local broker, staying subscribed in the background so the API can answer `GET /door/state` instantly from memory.
-- **Where it lives:** this is home-server code, not iOS app code — it likely belongs in its own small repo or directory on the server, separate from this iOS-app repo, unless the captain prefers keeping both together given the project's small size.
-
-## Open questions
-
-1. Which MQTT broker software is already running on the home server (Mosquitto is the common free choice)? It only needs to listen on the LAN now, not be reachable from outside.
-2. Does the home server already have a way to be reached from the internet for the Python service's HTTPS port (port forwarding, dynamic DNS / a domain name, or a tunnel service like Cloudflare Tunnel/Tailscale)?
-3. What should run the Python service — same box as the broker, a Docker container, a systemd service, or something else already used for other home-server projects?
-4. Just one door, or should the API/app design leave room for more than one?
-5. Just the captain using the app, or should it support multiple users/devices from day one?
+- This repository change prepares the VPS deployment; it does not deploy to the VPS.
+- The home-server deployment remains running for the captain's deliberate cutover and is not changed
+  by this architecture.
+- ESP32 firmware and hardware flashing are a later task. This repository does not generate or embed
+  a certificate into `esp32/`.
