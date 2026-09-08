@@ -2,6 +2,7 @@
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <WiFiManager.h>
 
 #include <time.h>
@@ -33,17 +34,19 @@
 #define MQTT_HOST DEFAULT_MQTT_HOST
 #endif
 #ifndef MQTT_PORT
-#define MQTT_PORT 1883
+#define MQTT_PORT 8883
 #endif
-#ifndef MQTT_USERNAME
-#define MQTT_USERNAME ""
+#ifndef MQTT_CA_CERT
+#define MQTT_CA_CERT ""
 #endif
-#ifndef MQTT_PASSWORD
-#define MQTT_PASSWORD ""
+#ifndef MQTT_CLIENT_CERT
+#define MQTT_CLIENT_CERT ""
+#endif
+#ifndef MQTT_CLIENT_KEY
+#define MQTT_CLIENT_KEY ""
 #endif
 
 static constexpr uint8_t RELAY_PIN = 4;
-static constexpr uint8_t CLOSED_SENSOR_PIN = 5;
 static constexpr uint8_t OPEN_SENSOR_PIN = 6;
 static constexpr uint8_t DOOR_LED_PIN = 8;
 
@@ -59,7 +62,7 @@ static constexpr char LWT_OFFLINE[] = R"({"online":false})";
 
 static constexpr unsigned long MQTT_RETRY_MS = 5000;
 
-WiFiClient wifiClient;
+WiFiClientSecure wifiClient;
 PubSubClient mqttClient(wifiClient);
 WiFiManager wifiManager;
 const char *doorState = "unknown";
@@ -147,19 +150,8 @@ void setLedForState() {
 }
 
 const char *readDoorState() {
-  const bool doorIsClosed = digitalRead(CLOSED_SENSOR_PIN) == LOW;
   const bool doorIsOpen = digitalRead(OPEN_SENSOR_PIN) == LOW;
-
-  if (doorIsClosed && !doorIsOpen) {
-    return "closed";
-  }
-  if (doorIsOpen && !doorIsClosed) {
-    return "open";
-  }
-
-  // Both HIGH means neither end-stop is active (transit/not fully seated).
-  // Both LOW is also physically contradictory, so report it as unknown.
-  return "unknown";
+  return doorIsOpen ? "open" : "closed";
 }
 
 void pollDoorSensors() {
@@ -292,6 +284,21 @@ String mqttClientId() {
   return String(clientId);
 }
 
+bool mqttTlsConfigured() {
+  return MQTT_CA_CERT[0] != '\0' && MQTT_CLIENT_CERT[0] != '\0' &&
+         MQTT_CLIENT_KEY[0] != '\0';
+}
+
+void configureMqttTls() {
+  if (!mqttTlsConfigured()) {
+    return;
+  }
+
+  wifiClient.setCACert(MQTT_CA_CERT);
+  wifiClient.setCertificate(MQTT_CLIENT_CERT);
+  wifiClient.setPrivateKey(MQTT_CLIENT_KEY);
+}
+
 void announceMqttConnection() {
   mqttClient.subscribe(commandTopic.c_str());
   mqttClient.publish(lwtTopic.c_str(), LWT_ONLINE, true);
@@ -301,20 +308,14 @@ void announceMqttConnection() {
 
 void connectMqttIfNeeded() {
   if (mqttClient.connected() || WiFi.status() != WL_CONNECTED || MQTT_HOST[0] == '\0' ||
-      millis() - lastMqttAttempt < MQTT_RETRY_MS) {
+      !mqttTlsConfigured() || millis() - lastMqttAttempt < MQTT_RETRY_MS) {
     return;
   }
 
   lastMqttAttempt = millis();
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
   const String clientId = mqttClientId();
-  bool connected;
-  if (MQTT_USERNAME[0] != '\0') {
-    connected = mqttClient.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD, lwtTopic.c_str(), 0,
-                                   true, LWT_OFFLINE);
-  } else {
-    connected = mqttClient.connect(clientId.c_str(), lwtTopic.c_str(), 0, true, LWT_OFFLINE);
-  }
+  const bool connected = mqttClient.connect(clientId.c_str(), lwtTopic.c_str(), 0, true, LWT_OFFLINE);
 
   if (connected) {
     announceMqttConnection();
@@ -327,13 +328,13 @@ void setup() {
   Serial.begin(115200);
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, RELAY_INACTIVE_LEVEL);
-  pinMode(CLOSED_SENSOR_PIN, INPUT_PULLUP);
   pinMode(OPEN_SENSOR_PIN, INPUT_PULLUP);
   pinMode(DOOR_LED_PIN, OUTPUT);
   pollDoorSensors();
   setLedForState();
 
   mqttClient.setCallback(onMqttMessage);
+  configureMqttTls();
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
   deviceMac = normalizedMacAddress();
@@ -342,6 +343,8 @@ void setup() {
 
   if (MQTT_HOST[0] == '\0') {
     Serial.println("MQTT not configured; firmware is offline until include/config.h is added");
+  } else if (!mqttTlsConfigured()) {
+    Serial.println("MQTT TLS not configured; add CA, client certificate, and private key to include/config.h");
   }
 }
 
