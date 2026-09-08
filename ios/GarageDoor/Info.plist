@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>APIBaseURL</key>
-	<string>https://garage-api.licongchen.org</string>
+	<string>https://iot.proximadigital.app</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
